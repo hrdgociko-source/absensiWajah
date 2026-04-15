@@ -339,9 +339,11 @@
 
                 <input type="text" 
                 id="input-nik"
-                placeholder="KETIK NIK ANDA"
+                placeholder="CONTOH: ABC123 atau GCK001"
                 autocomplete="off"
-                pattern="[A-Za-z0-9]+">    
+                pattern="[A-Z0-9]+"
+                inputmode="text"
+                style="text-transform: uppercase;">   
 
             <div id="user-info" class="hidden mt-2 p-3 bg-orange-50 rounded-xl border border-orange-100 text-center">
                 <p class="text-xs text-orange-400 font-semibold uppercase tracking-wider">Karyawan Ditemukan</p>
@@ -565,6 +567,10 @@
     //  5. CEK NIK SAAT INPUT (DEBOUNCED)
     // ============================================================
     document.getElementById('input-nik').addEventListener('input', (e) => {
+    // Auto convert to uppercase dan hanya izinkan A-Z dan 0-9
+    let value = e.target.value.toUpperCase();
+    value = value.replace(/[^A-Z0-9]/g, ''); // Hapus karakter selain A-Z dan 0-9
+    e.target.value = value;
         clearTimeout(typingTimer);
         const nik = e.target.value.trim();
         const btn = document.getElementById('btn-absensi');
