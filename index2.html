@@ -1,754 +1,964 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Absensi — Gociko</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gociko Absensi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: linear-gradient(145deg, #FF4B2B 0%, #FF8C00 60%, #FFB347 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'DM Sans', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 28px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.5);
+            width: 100%;
+            max-width: 400px;
+        }
+        .brand { font-family: 'Syne', sans-serif; }
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+        /* Video circle */
+        #video-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 5px solid transparent;
+            background: linear-gradient(white, white) padding-box,
+                        linear-gradient(135deg, #FF8C00, #FF4B2B) border-box;
+            box-shadow: 0 0 0 6px rgba(255, 140, 0, 0.15);
+        }
+        #video-container.scanning {
+            animation: pulse-ring 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-ring {
+            0%, 100% { box-shadow: 0 0 0 6px rgba(255, 140, 0, 0.15); }
+            50% { box-shadow: 0 0 0 14px rgba(255, 140, 0, 0.05); }
+        }
+        #video-container.success {
+            border-color: #22c55e;
+            background: linear-gradient(white, white) padding-box,
+                        linear-gradient(135deg, #22c55e, #16a34a) border-box;
+            box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.2);
+        }
+        #video-container.error {
+            border-color: #ef4444;
+            background: linear-gradient(white, white) padding-box,
+                        linear-gradient(135deg, #ef4444, #dc2626) border-box;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
 
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#FF4B2B">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="GOCIKO">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+        /* Face scan overlay */
+        #scan-overlay {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .scan-line {
+            position: absolute;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255, 140, 0, 0.8), transparent);
+            animation: scan 2s ease-in-out infinite;
+            display: none;
+        }
+        .scanning .scan-line { display: block; }
+        @keyframes scan {
+            0% { top: 15%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 85%; opacity: 0; }
+        }
 
-  <style>
-    * { box-sizing: border-box; }
-    body {
-        background: linear-gradient(145deg, #FF4B2B 0%, #FF8C00 60%, #FFB347 100%);
-        min-height: 100vh;
-        overflow: hidden;
-        font-family: 'DM Sans', sans-serif;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-    }
-    body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        pointer-events: none;
-    }
-    .glass-card {
-        background: rgba(255,255,255,0.97);
-        border-radius: 28px;
-        box-shadow: 0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.5);
-        width: 100%;
-        max-width: 400px;
-    }
-    .brand { font-family: 'Syne', sans-serif; }
+        /* Buttons */
+        .btn-datang {
+            background: linear-gradient(135deg, #FF8C00, #FF6B00);
+            color: white;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-datang::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+        }
+        .btn-pulang {
+            background: linear-gradient(135deg, #FFD700, #FFC200);
+            color: #7C3D00;
+        }
+        .btn-base {
+            padding: 1.1rem;
+            border-radius: 16px;
+            font-family: 'Syne', sans-serif;
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            width: 100%;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        .btn-base:active { transform: scale(0.97); }
+        .btn-base:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Video Circle */
-    #video-container {
-        position: relative; width: 220px; height: 220px;
-        margin: 0 auto; border-radius: 50%; overflow: hidden;
-        border: 5px solid transparent;
-        background: linear-gradient(white,white) padding-box,
-                    linear-gradient(135deg,#FF8C00,#FF4B2B) border-box;
-        box-shadow: 0 0 0 6px rgba(255,140,0,0.15);
-    }
-    #video-container.scanning { animation: pulse-ring 1.5s ease-in-out infinite; }
-    @keyframes pulse-ring {
-        0%,100% { box-shadow: 0 0 0 6px rgba(255,140,0,0.15); }
-        50%      { box-shadow: 0 0 0 14px rgba(255,140,0,0.05); }
-    }
-    #video-container.success {
-        background: linear-gradient(white,white) padding-box,
-                    linear-gradient(135deg,#22c55e,#16a34a) border-box;
-        box-shadow: 0 0 0 6px rgba(34,197,94,0.2);
-    }
-    #video-container.error {
-        background: linear-gradient(white,white) padding-box,
-                    linear-gradient(135deg,#ef4444,#dc2626) border-box;
-    }
-    #video-container.blink-mode {
-        background: linear-gradient(white,white) padding-box,
-                    linear-gradient(135deg,#3b82f6,#1d4ed8) border-box;
-        box-shadow: 0 0 0 6px rgba(59,130,246,0.15);
-        animation: pulse-blue 1s ease-in-out infinite;
-    }
-    @keyframes pulse-blue {
-        0%,100% { box-shadow: 0 0 0 6px rgba(59,130,246,0.15); }
-        50%      { box-shadow: 0 0 0 14px rgba(59,130,246,0.04); }
-    }
-    video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+        /* NIK Input */
+        #input-nik {
+            width: 100%;
+            border: 2px solid #e5e7eb;
+            padding: 0.85rem 1rem;
+            border-radius: 14px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #fafafa;
+            letter-spacing: 0.1em;
+        }
+        #input-nik:focus {
+            border-color: #FF8C00;
+            box-shadow: 0 0 0 4px rgba(255,140,0,0.1);
+            background: white;
+        }
 
-    /* Scan Overlay */
-    #scan-overlay { position:absolute; inset:0; border-radius:50%; pointer-events:none; }
-    .scan-line {
-        position:absolute; left:10%; right:10%; height:2px;
-        background: linear-gradient(90deg,transparent,rgba(255,140,0,0.8),transparent);
-        animation: scan 2s ease-in-out infinite; display:none;
-    }
-    .scanning .scan-line { display:block; }
-    @keyframes scan {
-        0%   { top:15%; opacity:0; }
-        10%  { opacity:1; }
-        90%  { opacity:1; }
-        100% { top:85%; opacity:0; }
-    }
+        /* Status badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-info { background: #eff6ff; color: #3b82f6; }
+        .status-success { background: #f0fdf4; color: #16a34a; }
+        .status-error { background: #fef2f2; color: #dc2626; }
+        .status-warning { background: #fffbeb; color: #d97706; }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .dot.pulse { animation: blink 1s ease-in-out infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-    /* Buttons */
-    .btn-datang {
-        background: linear-gradient(135deg,#FF8C00,#FF6B00);
-        color:white; border:none; position:relative; overflow:hidden;
-    }
-    .btn-datang::after {
-        content:''; position:absolute; inset:0;
-        background: linear-gradient(135deg,rgba(255,255,255,0.15),transparent);
-    }
-    .btn-pulang { background: linear-gradient(135deg,#FFD700,#FFC200); color:#7C3D00; }
-    .btn-base {
-        padding:1.1rem; border-radius:16px;
-        font-family:'Syne',sans-serif; font-size:1rem;
-        font-weight:800; letter-spacing:0.05em;
-        width:100%; cursor:pointer;
-        transition:transform 0.1s, box-shadow 0.1s;
-        box-shadow:0 4px 15px rgba(0,0,0,0.15);
-    }
-    .btn-base:active   { transform:scale(0.97); }
-    .btn-base:disabled { opacity:0.4; cursor:not-allowed; }
-    #btn-absensi { background:linear-gradient(135deg,#dc2626,#b91c1c); color:white; }
+        /* Outlet badge */
+        #outlet-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #fff7ed;
+            color: #ea580c;
+            border: 1px solid #fed7aa;
+        }
 
-    /* Status Badge */
-    .status-badge {
-        display:inline-flex; align-items:center; gap:6px;
-        padding:6px 14px; border-radius:999px;
-        font-size:0.75rem; font-weight:600;
-    }
-    .status-info    { background:#eff6ff; color:#3b82f6; }
-    .status-success { background:#f0fdf4; color:#16a34a; }
-    .status-error   { background:#fef2f2; color:#dc2626; }
-    .status-warning { background:#fffbeb; color:#d97706; }
-    .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
-    .dot.pulse { animation:blink 1s ease-in-out infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        /* Progress bar */
+        .progress-bar {
+            height: 4px;
+            background: #f3f4f6;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FF8C00, #FF4B2B);
+            border-radius: 999px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
 
-    /* Outlet Badge */
-    #outlet-badge {
-        display:inline-flex; align-items:center; gap:6px;
-        padding:5px 12px; border-radius:999px;
-        font-size:0.7rem; font-weight:600;
-        background:#fff7ed; color:#ea580c; border:1px solid #fed7aa;
-    }
+        #video-container.blink-mode {
+            border-color: #3b82f6;
+            background: linear-gradient(white, white) padding-box,
+                        linear-gradient(135deg, #3b82f6, #1d4ed8) border-box;
+            box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15);
+            animation: pulse-blue 1s ease-in-out infinite;
+        }
+        @keyframes pulse-blue {
+            0%, 100% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15); }
+            50%       { box-shadow: 0 0 0 14px rgba(59, 130, 246, 0.04); }
+        }
 
-    /* Progress Bar */
-    .progress-bar { height:4px; background:#f3f4f6; border-radius:999px; overflow:hidden; margin-top:8px; }
-    .progress-fill {
-        height:100%; background:linear-gradient(90deg,#FF8C00,#FF4B2B);
-        border-radius:999px; transition:width 0.4s ease; width:0%;
-    }
+        /* Countdown dots */
+        .blink-dots { display: flex; justify-content: center; gap: 6px; margin-top: 6px; }
+        .blink-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #d1d5db; transition: background 0.3s;
+        }
+        .blink-dot.active { background: #3b82f6; }
+        .blink-dot.done   { background: #22c55e; }
 
-    /* Countdown Dots */
-    .blink-dots { display:flex; justify-content:center; gap:6px; margin-top:6px; }
-    .blink-dot  { width:8px; height:8px; border-radius:50%; background:#d1d5db; transition:background 0.3s; }
-    .blink-dot.active { background:#3b82f6; }
-    .blink-dot.done   { background:#22c55e; }
+        /* Loading spinner */
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid #fed7aa;
+            border-top-color: #FF8C00;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Spinner */
-    .spinner {
-        width:36px; height:36px; border:3px solid #fed7aa;
-        border-top-color:#FF8C00; border-radius:50%;
-        animation:spin 0.8s linear infinite; margin:0 auto;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
+        /* Success checkmark */
+        .check-circle {
+            width: 64px; height: 64px;
+            background: #22c55e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
 
-    /* Check Circle */
-    .check-circle {
-        width:64px; height:64px; background:#22c55e;
-        border-radius:50%; display:flex; align-items:center;
-        justify-content:center; margin:0 auto;
-        animation:pop 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    }
-    @keyframes pop { from{transform:scale(0)} to{transform:scale(1)} }
-
-    .section { transition:opacity 0.2s; }
-    .section.hidden { display:none; }
-  </style>
+        /* Konfirmasi absen button */
+        #btn-absensi {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+        }
+    </style>
 </head>
 <body>
-  <div id="app" class="glass-card">
+    <div id="app" class="glass-card">
 
-    <!-- SECTION: LOADING -->
-    <div id="section-loading" class="section p-8 text-center">
-      <div class="spinner mb-4"></div>
-      <p class="brand font-bold text-gray-600 text-sm">Menghubungkan ke Server...</p>
-      <p class="text-xs text-gray-400 mt-1">Memverifikasi lokasi Anda</p>
-    </div>
-
-    <!-- SECTION: MAIN MENU -->
-    <div id="section-main" class="section hidden p-6">
-      <div class="text-center mb-5">
-        <h1 class="brand text-3xl font-extrabold text-orange-600 tracking-tight">GOCIKO</h1>
-        <p class="text-xs text-gray-400 font-semibold tracking-widest uppercase mb-3">Sistem Absensi</p>
-        <div id="outlet-badge">
-          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-          </svg>
-          <span id="outlet-text">Mencari Lokasi...</span>
+        <!-- SECTION: LOADING -->
+        <div id="section-loading" class="section p-8 text-center">
+            <div class="spinner mb-4"></div>
+            <p class="brand font-bold text-gray-600 text-sm">Menghubungkan ke Server...</p>
+            <p class="text-xs text-gray-400 mt-1">Memverifikasi lokasi Anda</p>
         </div>
-        <p id="outlet-welcome" class="hidden text-sm font-bold text-green-600 mt-2"></p>
-      </div>
 
-      <div id="geofence-warning" class="hidden bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-center">
-        <p class="text-xs font-bold text-red-600">⚠️ Anda berada di luar area outlet!</p>
-        <p class="text-xs text-red-500 mt-1">Absensi hanya bisa dilakukan di lokasi outlet terdaftar.</p>
-      </div>
+        <!-- SECTION: MAIN MENU -->
+        <div id="section-main" class="section hidden p-6">
+            <div class="text-center mb-5">
+                <h1 class="brand text-3xl font-extrabold text-orange-600 tracking-tight">GOCIKO</h1>
+                <p class="text-xs text-gray-400 font-semibold tracking-widest uppercase mb-3">Sistem Absensi</p>
+                <div id="outlet-badge">
+                    <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                    <span id="outlet-text">Mencari Lokasi...</span>
+                </div>
+                <p id="outlet-welcome" class="hidden text-sm font-bold text-green-600 mt-2">Selamat datang!</p>
+            </div>
 
-      <div class="grid gap-3">
-        <button id="btn-datang" onclick="showCamera('DATANG')" class="btn-base btn-datang">
-          🟢 &nbsp;ABSEN MASUK
-        </button>
-        <button id="btn-pulang" onclick="showCamera('PULANG')" class="btn-base btn-pulang">
-          🔴 &nbsp;ABSEN PULANG
-        </button>
-      </div>
+            <div id="geofence-warning" class="hidden bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-center">
+                <p class="text-xs font-bold text-red-600">⚠️ Anda berada di luar area outlet!</p>
+                <p class="text-xs text-red-500 mt-1">Absensi hanya bisa dilakukan di lokasi outlet terdaftar.</p>
+            </div>
 
-      <div id="models-status" class="mt-4 text-center">
-        <span class="status-badge status-warning">
-          <span class="dot pulse"></span>Memuat sensor wajah...
-        </span>
-      </div>
-      <div class="progress-bar mt-2">
-        <div id="model-progress" class="progress-fill"></div>
-      </div>
+            <div class="grid gap-3">
+                <button id="btn-datang" onclick="showCamera('DATANG')" class="btn-base btn-datang">
+                    🟢 &nbsp;ABSEN MASUK
+                </button>
+                <button id="btn-pulang" onclick="showCamera('PULANG')" class="btn-base btn-pulang">
+                    🔴 &nbsp;ABSEN PULANG
+                </button>
+            </div>
 
-      <p class="text-center text-xs text-gray-300 mt-4 font-medium">
-        <a class="text-orange-400>Copyright © 2026 GOCIKO. All rights reserved.</a>
-      </p>
-    </div>
+            <div id="models-status" class="mt-4 text-center">
+                <span class="status-badge status-warning">
+                    <span class="dot pulse"></span>
+                    Memuat sensor wajah...
+                </span>
+            </div>
 
-    <!-- SECTION: CAMERA -->
-    <div id="section-camera" class="section hidden p-6">
-      <div class="flex items-center mb-4">
-        <button onclick="backToMain()" class="text-gray-400 hover:text-gray-600 mr-3 text-xl">←</button>
-        <div>
-          <h2 id="cam-title" class="brand font-extrabold text-gray-800 text-lg leading-tight">Verifikasi Wajah</h2>
-          <p id="cam-type-badge" class="text-xs font-bold text-orange-500"></p>
+            <div class="progress-bar mt-2">
+                <div id="model-progress" class="progress-fill"></div>
+            </div>
+
+            <p class="text-center text-xs text-gray-300 mt-4 font-medium">
+                <a class="text-orange-400">Copyright@Gociko 2026</a>
+            </p>
         </div>
-      </div>
 
-      <div id="video-container" class="mb-3">
-        <video id="video" autoplay muted playsinline></video>
-        <div id="scan-overlay"><div class="scan-line"></div></div>
-      </div>
+        <!-- SECTION: CAMERA (ABSENSI) -->
+        <div id="section-camera" class="section hidden p-6">
+            <div class="flex items-center mb-4">
+                <button onclick="backToMain()" class="text-gray-400 hover:text-gray-600 mr-3 text-xl">←</button>
+                <div>
+                    <h2 id="cam-title" class="brand font-extrabold text-gray-800 text-lg leading-tight">Verifikasi Wajah</h2>
+                    <p id="cam-type-badge" class="text-xs font-bold text-orange-500"></p>
+                </div>
+            </div>
 
-      <div class="text-center mb-3">
-        <span id="cam-status-badge" class="status-badge status-info">
-          <span class="dot pulse"></span>
-          <span id="cam-status-text">Memuat sensor...</span>
-        </span>
-        <div id="blink-instruction" class="hidden mt-2">
-          <p class="text-xs font-bold text-blue-600" id="shake-label">Hadap kamera...</p>
-          <div class="blink-dots">
-            <div class="blink-dot" id="bdot-1"></div>
-            <div class="blink-dot" id="bdot-2"></div>
-            <div class="blink-dot" id="bdot-3"></div>
-            <div class="blink-dot" id="bdot-4"></div>
-            <div class="blink-dot" id="bdot-5"></div>
-          </div>
+            <div id="video-container" class="mb-3">
+                <video id="video" autoplay muted playsinline></video>
+                <div id="scan-overlay"><div class="scan-line"></div></div>
+            </div>
+
+            <div class="text-center mb-3">
+                <span id="cam-status-badge" class="status-badge status-info">
+                    <span class="dot pulse"></span>
+                    <span id="cam-status-text">Memuat sensor...</span>
+                </span>
+                <!-- Blink instruction — muncul saat anti-spoofing aktif -->
+                <div id="blink-instruction" class="hidden mt-2">
+                    <p class="text-xs font-bold text-blue-600" id="shake-label">Tatap kamera lurus...</p>
+                    <div class="blink-dots">
+                        <div class="blink-dot" id="bdot-1"></div>
+                        <div class="blink-dot" id="bdot-2"></div>
+                        <div class="blink-dot" id="bdot-3"></div>
+                        <div class="blink-dot" id="bdot-4"></div>
+                        <div class="blink-dot" id="bdot-5"></div>
+                    </div>
+                </div>
+            </div>
+
+                <input type="text" 
+                id="input-nik"
+                placeholder="CONTOH: ABC123 atau GCK001"
+                autocomplete="off"
+                pattern="[A-Z0-9]+"
+                inputmode="text"
+                style="text-transform: uppercase;">   
+
+            <div id="user-info" class="hidden mt-2 p-3 bg-orange-50 rounded-xl border border-orange-100 text-center">
+                <p class="text-xs text-orange-400 font-semibold uppercase tracking-wider">Karyawan Ditemukan</p>
+                <p id="user-name-display" class="brand font-extrabold text-gray-800 text-base mt-0.5"></p>
+                <p id="user-outlet-display" class="text-xs text-gray-500"></p>
+            </div>
+
+            <button id="btn-absensi" onclick="startVerification()"
+                    class="btn-base mt-3"
+                    style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white;"
+                    disabled>
+                KONFIRMASI ABSENSI
+            </button>
+            <button onclick="backToMain()" class="mt-2 w-full text-gray-400 text-xs py-2">Batal</button>
         </div>
-      </div>
 
-      <button id="btn-absensi" onclick="startVerification()" class="btn-base mt-3">
-        KONFIRMASI ABSENSI
-      </button>
-      <button onclick="backToMain()" class="mt-2 w-full text-gray-400 text-xs py-2">Batal</button>
+        <!-- SECTION: PROCESSING -->
+        <div id="section-processing" class="section hidden p-8 text-center">
+            <div class="spinner mb-4" style="border-top-color: #dc2626; border-color: #fecaca;"></div>
+            <p class="brand font-bold text-gray-700">Memproses Absensi...</p>
+            <p id="processing-text" class="text-xs text-gray-400 mt-1">Mendeteksi wajah</p>
+        </div>
+
+        <!-- SECTION: SUCCESS -->
+        <div id="section-success" class="section hidden p-8 text-center">
+            <div class="check-circle mb-4">
+                <svg width="28" height="28" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <h2 class="brand font-extrabold text-gray-800 text-xl mb-1">Absensi Berhasil!</h2>
+            <p id="success-name" class="text-orange-600 font-semibold text-sm mb-1"></p>
+            <p id="success-detail" class="text-gray-400 text-xs mb-4"></p>
+            <div id="success-info" class="bg-gray-50 rounded-xl p-3 text-left text-xs text-gray-500 space-y-1 mb-5">
+            </div>
+            <button onclick="location.reload()" class="btn-base btn-datang">Selesai</button>
+        </div>
+
     </div>
 
-    <!-- SECTION: KONFIRMASI IDENTITAS -->
-    <div id="section-konfirmasi" class="section hidden p-6 text-center">
-      <div class="mb-5">
-        <div class="text-5xl mb-3">👤</div>
-        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Wajah Dikenali Sebagai</p>
-        <h2 id="konfirmasi-nama" class="brand font-extrabold text-gray-800 text-2xl mb-1"></h2>
-        <p id="konfirmasi-nik" class="text-xs text-gray-400 mb-1"></p>
-        <p id="konfirmasi-outlet" class="text-xs text-gray-500 mb-3"></p>
-        <span id="konfirmasi-type" class="status-badge status-info font-bold"></span>
-      </div>
-      <p class="text-sm text-gray-600 font-semibold mb-4">Apakah ini Anda?</p>
-      <div class="grid gap-3">
-        <button onclick="konfirmasiAbsensi()" class="btn-base btn-datang">✅ &nbsp;Ya, Saya</button>
-        <button onclick="batalKonfirmasi()" class="btn-base" style="background:#f1f5f9;color:#475569;box-shadow:none;">❌ &nbsp;Bukan Saya</button>
-      </div>
-    </div>
+    <script>
+    // ============================================================
+    //  KONFIGURASI — Ganti dengan URL GAS Anda
+    // ============================================================
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbw38TPT6O6ojdNk2My0myqoogT7FmIbVFbC_sL3ET-srsPO7lRE5jSmuxrQOFAuA5c/exec";
 
-    <!-- SECTION: PROCESSING -->
-    <div id="section-processing" class="section hidden p-8 text-center">
-      <div class="spinner mb-4" style="border-top-color:#dc2626;border-color:#fecaca;"></div>
-      <p class="brand font-bold text-gray-700">Memproses Absensi...</p>
-      <p id="processing-text" class="text-xs text-gray-400 mt-1">Menyimpan data</p>
-    </div>
+    // ============================================================
+    //  STATE GLOBAL
+    // ============================================================
+    let selectedType = "";
+    let currentUser = null;       // { nik, nama, outlet }
+    let currentOutlet = "";       // Nama outlet dari hasil geofencing
+    let allDescriptors = [];      // [{ nik, nama, outlet, descriptor: Float32Array }]
+    let modelsReady = false;
+    let streamRef = null;
+    let typingTimer;
+    const TYPING_DELAY = 700;
+    const FACE_MATCH_THRESHOLD = 0.45;
 
-    <!-- SECTION: SUCCESS -->
-    <div id="section-success" class="section hidden p-8 text-center">
-      <div class="check-circle mb-4">
-        <svg width="28" height="28" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-        </svg>
-      </div>
-      <h2 class="brand font-extrabold text-gray-800 text-xl mb-1">Absensi Berhasil!</h2>
-      <p id="success-name" class="text-orange-600 font-semibold text-sm mb-1"></p>
-      <p id="success-detail" class="text-gray-400 text-xs mb-4"></p>
-      <div id="success-info" class="bg-gray-50 rounded-xl p-3 text-left text-xs text-gray-500 space-y-1 mb-5"></div>
-      <button onclick="location.reload()" class="btn-base btn-datang">Selesai</button>
-    </div>
+    // ============================================================
+    //  1. INISIALISASI — CEK LOKASI + LOAD MODELS
+    // ============================================================
+    window.onload = async () => {
+        if (!navigator.geolocation) {
+            alertError("Browser tidak mendukung GPS.");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+                const res = await fetch(`${GAS_URL}?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+                const data = await res.json();
 
-  </div>
+                const outletEl = document.getElementById('outlet-text');
+                const warningEl = document.getElementById('geofence-warning');
 
-  <script>
-  // ============================================================
-  //  CONFIG
-  // ============================================================
-  const GAS_URL            = "https://script.google.com/macros/s/AKfycbw38TPT6O6ojdNk2My0myqoogT7FmIbVFbC_sL3ET-srsPO7lRE5jSmuxrQOFAuA5c/exec";
-  const MODEL_SOURCES      = ['https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'];
-  const FACE_MATCH_THRESHOLD = 0.55;
-  const HEAD_MOVE_RATIO    = 0.15;
-  const SHAKE_TIMEOUT_MS   = 6000;
-  const SAMPLE_MS          = 80;
+                if (data.outletName) {
+                    currentOutlet = data.outletName;
+                    outletEl.innerText = data.outletName;
+                    document.getElementById('outlet-badge').style.background = '#f0fdf4';
+                    document.getElementById('outlet-badge').style.color = '#16a34a';
+                    document.getElementById('outlet-badge').style.borderColor = '#bbf7d0';
+                    // Pesan sambutan outlet
+                    const welcomeEl = document.getElementById('outlet-welcome');
+                    if (welcomeEl) {
+                        welcomeEl.innerText = `Selamat datang di ${data.outletName}!`;
+                        welcomeEl.classList.remove('hidden');
+                    }
+                } else {
+                    currentOutlet = "";
+                    outletEl.innerText = "Lokasi Tidak Dikenali";
+                    warningEl.classList.remove('hidden');
+                    document.getElementById('btn-datang').disabled = true;
+                    document.getElementById('btn-pulang').disabled = true;
+                }
+            } catch (e) {
+                document.getElementById('outlet-text').innerText = "Gociko (Mode Offline)";
+            }
 
-  // ============================================================
-  //  API
-  // ============================================================
-  async function fetchGeofence(lat, lon) {
-      const res = await fetch(`${GAS_URL}?lat=${lat}&lon=${lon}`);
-      return res.json();
-  }
-  async function fetchAllKaryawan() {
-      const res = await fetch(`${GAS_URL}?action=get_all_karyawan`);
-      return res.json();
-  }
-  async function postAbsensi(payload) {
-      const res = await fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(payload)
-      });
-      return res.text();
-  }
+            showSection('section-main');
+            loadModels();
+        }, (err) => {
+            showSection('section-main');
+            document.getElementById('outlet-text').innerText = "GPS Tidak Aktif";
+            document.getElementById('geofence-warning').classList.remove('hidden');
+            document.getElementById('geofence-warning').querySelector('p').innerText = "⚠️ Aktifkan GPS untuk verifikasi lokasi!";
+            loadModels();
+        }, { timeout: 10000, enableHighAccuracy: true });
+    };
 
-  // ============================================================
-  //  CAMERA
-  // ============================================================
-  let streamRef = null;
+    // ============================================================
+    //  2. LOAD FACE-API MODELS (CDN dengan fallback)
+    // ============================================================
 
-  function stopStream() {
-      if (streamRef) { streamRef.getTracks().forEach(t => t.stop()); streamRef = null; }
-  }
+    const MODEL_SOURCES = [
+        'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/',
+        'https://raw.githubusercontent.com/vladmandic/face-api/master/model/',
+        'https://cdn.jsdelivr.net/gh/vladmandic/face-api@master/model/'
+    ];
 
-  async function startCamera() {
-      try {
-          stopStream();
-          const stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 320 } }
-          });
-          streamRef = stream;
-          const video = document.getElementById('video');
-          video.srcObject = stream;
-          await new Promise(resolve => {
-              if (video.readyState >= 2) { resolve(); return; }
-              video.addEventListener('canplay', resolve, { once: true });
-          });
-      } catch (e) {
-          setCamStatus('error', 'Kamera tidak bisa diakses!');
-      }
-  }
+    async function loadModels() {
+        const progressEl = document.getElementById('model-progress');
+        const statusEl   = document.getElementById('models-status');
 
-  window.addEventListener('beforeunload', stopStream);
+        async function tryLoad(netName, loadFn, pct) {
+            for (let i = 0; i < MODEL_SOURCES.length; i++) {
+                try {
+                    statusEl.innerHTML = `<span class="status-badge status-warning"><span class="dot pulse"></span>Memuat ${netName} (sumber ${i + 1})...</span>`;
+                    await Promise.race([
+                        loadFn(MODEL_SOURCES[i]),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), 20000))
+                    ]);
+                    progressEl.style.width = pct + '%';
+                    return; // berhasil
+                } catch (e) {
+                    console.warn(`[Gociko] ${netName} gagal sumber ${i + 1}:`, e.message);
+                    if (i === MODEL_SOURCES.length - 1) throw e;
+                }
+            }
+        }
 
-  // ============================================================
-  //  FACE MATCH
-  // ============================================================
-  let modelsReady       = false;
-  let allDescriptors    = [];
-  let outletDescriptors = [];
+        try {
+            await tryLoad('sensor wajah (1/3)', url => faceapi.nets.tinyFaceDetector.loadFromUri(url), 33);
+            await tryLoad('sensor wajah (2/3)', url => faceapi.nets.faceLandmark68Net.loadFromUri(url), 66);
+            await tryLoad('sensor wajah (3/3)', url => faceapi.nets.faceRecognitionNet.loadFromUri(url), 100);
 
-  async function loadModels() {
-      const progressEl = document.getElementById('model-progress');
-      const statusEl   = document.getElementById('models-status');
+            modelsReady = true;
+            statusEl.innerHTML = `<span class="status-badge status-success"><span class="dot"></span>Sensor Wajah Siap ✓</span>`;
+            await loadAllDescriptors();
 
-      async function tryLoad(name, loadFn, pct) {
-          for (let i = 0; i < MODEL_SOURCES.length; i++) {
-              try {
-                  statusEl.innerHTML = `<span class="status-badge status-warning"><span class="dot pulse"></span>Memuat ${name}...</span>`;
-                  await Promise.race([
-                      loadFn(MODEL_SOURCES[i]),
-                      new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), 20000))
-                  ]);
-                  progressEl.style.width = pct + '%';
-                  return;
-              } catch (e) {
-                  if (i === MODEL_SOURCES.length - 1) throw e;
-              }
-          }
-      }
+        } catch (e) {
+            console.error('[Gociko] loadModels error:', e);
+            statusEl.innerHTML = `
+                <span class="status-badge status-error" style="flex-direction:column;gap:6px;padding:8px 14px">
+                    <span>⚠️ Gagal memuat sensor wajah</span>
+                    <button onclick="loadModels()" style="font-size:0.7rem;text-decoration:underline;font-weight:700">🔄 Coba Lagi</button>
+                </span>`;
+        }
+    }
+    // ============================================================
+    //  3. AMBIL SEMUA FACE DESCRIPTOR DARI DATABASE
+    // ============================================================
+    async function loadAllDescriptors() {
+        try {
+            const res = await fetch(`${GAS_URL}?action=get_all_karyawan`);
+            const data = await res.json();
+            if (data.karyawan && Array.isArray(data.karyawan)) {
+                allDescriptors = data.karyawan
+                    .filter(k => k.wajah && k.wajah.length === 128)
+                    .map(k => ({
+                        nik: k.nik,
+                        nama: k.nama,
+                        outlet: k.outlet,
+                        descriptor: new Float32Array(k.wajah)
+                    }));
+                console.log(`[Gociko] ${allDescriptors.length} wajah dimuat dari database.`);
+            }
+        } catch (e) {
+            console.warn("[Gociko] Gagal load descriptor:", e);
+        }
+    }
 
-      try {
-          await tryLoad('sensor wajah (1/3)', url => faceapi.nets.tinyFaceDetector.loadFromUri(url), 33);
-          await tryLoad('sensor wajah (2/3)', url => faceapi.nets.faceLandmark68Net.loadFromUri(url), 66);
-          await tryLoad('sensor wajah (3/3)', url => faceapi.nets.faceRecognitionNet.loadFromUri(url), 100);
-          modelsReady = true;
-          statusEl.innerHTML = '<span class="status-badge status-success"><span class="dot"></span>Sensor Wajah Siap ✓</span>';
-          await loadAllDescriptors();
-      } catch (e) {
-          statusEl.innerHTML = `<span class="status-badge status-error" style="flex-direction:column;gap:6px;padding:8px 14px"><span>⚠️ Gagal memuat sensor wajah</span><button onclick="loadModels()" style="font-size:0.7rem;text-decoration:underline;font-weight:700">🔄 Coba Lagi</button></span>`;
-      }
-  }
+    // ============================================================
+    //  4. TAMPILKAN KAMERA
+    // ============================================================
+    async function showCamera(type) {
+        if (!modelsReady) {
+            alert("Sensor wajah belum siap. Tunggu sebentar lagi ya!");
+            return;
+        }
+        selectedType = type;
+        currentUser = null;
 
-  async function loadAllDescriptors() {
-      try {
-          const data = await fetchAllKaryawan();
-          if (data.karyawan && Array.isArray(data.karyawan)) {
-              allDescriptors = data.karyawan
-                  .filter(k => k.wajah && k.wajah.length === 128)
-                  .map(k => ({ nik: k.nik, nama: k.nama, outlet: k.outlet, descriptor: new Float32Array(k.wajah) }));
-          }
-      } catch (e) { console.warn('[Gociko] Gagal load descriptor:', e); }
-  }
+        document.getElementById('cam-title').innerText = type === 'DATANG' ? 'Absen Masuk' : 'Absen Pulang';
+        document.getElementById('cam-type-badge').innerText = type === 'DATANG' ? '🟢 Masuk Kerja' : '🔴 Pulang Kerja';
+        document.getElementById('input-nik').value = '';
+        document.getElementById('user-info').classList.add('hidden');
+        document.getElementById('btn-absensi').disabled = true;
+        setCamStatus('info', 'Isi NIK Anda, lalu konfirmasi');
 
-  function filterDescriptorByOutlet(outlet) {
-      outletDescriptors = outlet ? allDescriptors.filter(k => k.outlet === outlet) : allDescriptors;
-      console.log(`[Gociko] ${outletDescriptors.length} wajah untuk outlet: ${outlet || 'semua'}`);
-  }
+        showSection('section-camera');
+        document.getElementById('video-container').className = '';
 
-  async function detectFace(video) {
-      let detection = null;
-      for (let i = 0; i < 5; i++) {
-          detection = await faceapi
-              .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.45 }))
-              .withFaceLandmarks().withFaceDescriptor();
-          if (detection) break;
-          await new Promise(r => setTimeout(r, 300));
-      }
-      return detection;
-  }
+        try {
+            stopStream();
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 320 } }
+            });
+            streamRef = stream;
+            const video = document.getElementById('video');
+            video.srcObject = stream;
 
-  function matchFaceInOutlet(descriptor) {
-      if (!outletDescriptors.length) return null;
-      let best = null, bestDist = Infinity;
-      outletDescriptors.forEach(k => {
-          const dist = faceapi.euclideanDistance(descriptor, k.descriptor);
-          if (dist < bestDist) { bestDist = dist; best = k; }
-      });
-      console.log(`[Gociko] Best match: ${best?.nama} dist: ${bestDist.toFixed(4)}`);
-      return bestDist <= FACE_MATCH_THRESHOLD ? { ...best, distance: bestDist } : null;
-  }
+            // Tunggu video benar-benar siap sebelum lanjut
+            await new Promise((resolve) => {
+                if (video.readyState >= 2) { resolve(); return; }
+                video.addEventListener('canplay', resolve, { once: true });
+            });
+        } catch (e) {
+            setCamStatus('error', 'Kamera tidak bisa diakses!');
+        }
+    }
 
-  // ============================================================
-  //  ANTI-SPOOFING
-  // ============================================================
-  function getFaceMetrics(landmarks) {
-      const pts = landmarks.positions;
-      return {
-          noseX: pts[30].x,
-          faceWidth: Math.abs(pts[16].x - pts[0].x)
-      };
-  }
+    // ============================================================
+    //  5. CEK NIK SAAT INPUT (DEBOUNCED)
+    // ============================================================
+    document.getElementById('input-nik').addEventListener('input', (e) => {
+    // Auto convert to uppercase dan hanya izinkan A-Z dan 0-9
+    let value = e.target.value.toUpperCase();
+    value = value.replace(/[^A-Z0-9]/g, ''); // Hapus karakter selain A-Z dan 0-9
+    e.target.value = value;
+        clearTimeout(typingTimer);
+        const nik = e.target.value.trim();
+        const btn = document.getElementById('btn-absensi');
+        const userInfoEl = document.getElementById('user-info');
 
-  async function getLandmarks(video) {
-      const det = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
-          .withFaceLandmarks();
-      return det ? getFaceMetrics(det.landmarks) : null;
-  }
+        btn.disabled = true;
+        currentUser = null;
+        userInfoEl.classList.add('hidden');
 
-  async function detectHeadShake(video) {
-      const container   = document.getElementById('video-container');
-      const instruction = document.getElementById('blink-instruction');
-      const labelEl     = document.getElementById('shake-label');
-      const dots        = [1,2,3,4,5].map(i => document.getElementById('bdot-' + i));
-      let dotIndex      = 0;
+        if (nik.length < 3) {
+            setCamStatus('info', 'Isi NIK Anda');
+            return;
+        }
 
-      container.classList.add('blink-mode');
-      instruction.classList.remove('hidden');
+        setCamStatus('warning', 'Mengecek database...');
 
-      function updateDots(elapsed, total) {
-          const progress = Math.floor((elapsed / total) * 5);
-          while (dotIndex < progress && dotIndex < 5) { dots[dotIndex++].classList.add('active'); }
-      }
+        typingTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`${GAS_URL}?cek_nik=${nik}`);
+                const data = await res.json();
 
-      function cleanup() {
-          container.classList.remove('blink-mode');
-          instruction.classList.add('hidden');
-          dots.forEach(d => { d.className = 'blink-dot'; });
-      }
+                // NIK tidak ditemukan
+                if (!data.nama || data.nama === "Tidak Dikenal") {
+                    setCamStatus('error', 'NIK tidak ditemukan di database!');
+                    return;
+                }
 
-      // Warm-up
-      setCamStatus('info', 'Hadap kamera...');
-      if (labelEl) labelEl.textContent = 'Hadap kamera...';
-      const warmupDeadline = Date.now() + 3000;
-      let faceFound = false;
-      while (Date.now() < warmupDeadline) {
-          if (await getLandmarks(video)) { faceFound = true; break; }
-          await new Promise(r => setTimeout(r, SAMPLE_MS));
-      }
-      if (!faceFound) { cleanup(); setCamStatus('error', 'Wajah tidak terdeteksi! Pastikan pencahayaan cukup.'); return false; }
+                // NIK ditemukan tapi outlet tidak cocok
+                if (currentOutlet && data.outlet !== currentOutlet) {
+                    setCamStatus('error', `NIK ${nik} tidak terdapat di Outlet ${currentOutlet}!`);
+                    return;
+                }
 
-      // Baseline 800ms
-      const baselineStart = Date.now(), samples = [];
-      while (Date.now() - baselineStart < 800) {
-          const m = await getLandmarks(video);
-          if (m) samples.push(m);
-          await new Promise(r => setTimeout(r, SAMPLE_MS));
-      }
-      if (samples.length < 2) { cleanup(); setCamStatus('error', 'Wajah tidak terdeteksi! Pastikan pencahayaan cukup.'); return false; }
+                // ✅ NIK valid dan outlet cocok
+                currentUser = data;
+                document.getElementById('user-name-display').innerText = data.nama;
+                document.getElementById('user-outlet-display').innerText = `📍 ${data.outlet || '-'}`;
+                userInfoEl.classList.remove('hidden');
+                setCamStatus('success', `Silahkan ${data.nama} melakukan konfirmasi.`);
+                btn.disabled = false;
 
-      samples.sort((a, b) => a.noseX - b.noseX);
-      const baseline = samples[Math.floor(samples.length / 2)];
-      const minMove  = baseline.faceWidth * HEAD_MOVE_RATIO;
+            } catch (err) {
+                setCamStatus('error', 'Koneksi server terganggu');
+            }
+        }, TYPING_DELAY);
+    });
 
-      // Minta geleng
-      setCamStatus('info', '↔️ Gelengkan kepala 1x!');
-      if (labelEl) labelEl.textContent = '↔️ Gelengkan kepala 1x!';
-      dots.forEach(d => { d.className = 'blink-dot'; });
-      dotIndex = 0;
+    // ============================================================
+    //  6. ANTI-SPOOFING — DETEKSI GERAK KEPALA (Nose Tip Movement)
+    // ============================================================
 
-      const detectStart = Date.now();
-      let maxLeft = 0, maxRight = 0;
-      while (Date.now() - detectStart < SHAKE_TIMEOUT_MS) {
-          updateDots(Date.now() - detectStart, SHAKE_TIMEOUT_MS);
-          const m = await getLandmarks(video);
-          if (m) {
-              const dx = m.noseX - baseline.noseX;
-              if (dx < 0) maxLeft  = Math.max(maxLeft,  Math.abs(dx));
-              else        maxRight = Math.max(maxRight, dx);
-              if (maxLeft >= minMove || maxRight >= minMove) {
-                  dots.forEach(d => { d.classList.remove('active'); d.classList.add('done'); });
-                  await new Promise(r => setTimeout(r, 250));
-                  cleanup();
-                  return true;
-              }
-          }
-          await new Promise(r => setTimeout(r, SAMPLE_MS));
-      }
-      cleanup();
-      return false;
-  }
+    // Ambil posisi nose tip (landmark 30) dan lebar wajah (landmark 0–16)
+    function getFaceMetrics(landmarks) {
+        const pts      = landmarks.positions;
+        const noseTip  = pts[30];                         // titik ujung hidung
+        const faceLeft = pts[0];                          // tepi kiri wajah
+        const faceRight= pts[16];                         // tepi kanan wajah
+        const faceWidth= Math.abs(faceRight.x - faceLeft.x);
+        return { noseX: noseTip.x, noseY: noseTip.y, faceWidth };
+    }
 
-  // ============================================================
-  //  APP — MAIN FLOW
-  // ============================================================
-  let selectedType  = "";
-  let currentUser   = null;
-  let currentOutlet = "";
-  let isProcessing  = false;
+    async function getLandmarks(video) {
+        const det = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
+            .withFaceLandmarks();
+        if (!det) return null;
+        return getFaceMetrics(det.landmarks);
+    }
 
-  window.onload = async () => {
-      if (!navigator.geolocation) {
-          showSection('section-main');
-          document.getElementById('outlet-text').innerText = "GPS Tidak Didukung";
-          loadModels();
-          return;
-      }
-      navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-              await cekGeofenceWithRetry(pos.coords.latitude, pos.coords.longitude);
-              showSection('section-main');
-              loadModels();
-          },
-          () => {
-              showSection('section-main');
-              document.getElementById('outlet-text').innerText = "GPS Tidak Aktif";
-              const w = document.getElementById('geofence-warning');
-              w.classList.remove('hidden');
-              w.querySelector('p').innerText = "⚠️ Aktifkan GPS untuk verifikasi lokasi!";
-              loadModels();
-          },
-          { timeout: 15000, enableHighAccuracy: true }
-      );
-  };
+    // Gerak kepala valid = hidung bergerak > 15% lebar wajah ke kiri ATAU kanan
+    const HEAD_MOVE_RATIO  = 0.15;
+    const SHAKE_TIMEOUT_MS = 8000;
+    const BASELINE_MS      = 2000;
+    const WARMUP_MS        = 2000;
+    const SAMPLE_MS        = 80;
 
-  async function cekGeofenceWithRetry(lat, lon) {
-      const outletEl  = document.getElementById('outlet-text');
-      const warningEl = document.getElementById('geofence-warning');
-      const MAX_RETRY = 3;
+    async function detectHeadShake(video) {
+        const container   = document.getElementById('video-container');
+        const instruction = document.getElementById('blink-instruction');
+        const dots        = [1,2,3,4,5].map(i => document.getElementById(`bdot-${i}`));
+        const labelEl     = document.getElementById('shake-label');
 
-      for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
-          try {
-              outletEl.innerText = attempt === 1 ? 'Mencari lokasi...' : `Mencari lokasi... (${attempt}/${MAX_RETRY})`;
-              const data = await Promise.race([
-                  fetchGeofence(lat, lon),
-                  new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), 12000))
-              ]);
-              if (data.outletName) {
-                  currentOutlet = data.outletName;
-                  outletEl.innerText = data.outletName;
-                  document.getElementById('outlet-badge').style.cssText = 'background:#f0fdf4;color:#16a34a;border-color:#bbf7d0';
-                  const w = document.getElementById('outlet-welcome');
-                  if (w) { w.innerText = 'Selamat datang di ' + data.outletName + '!'; w.classList.remove('hidden'); }
-              } else {
-                  currentOutlet = "";
-                  outletEl.innerText = "Lokasi Tidak Dikenali";
-                  warningEl.classList.remove('hidden');
-                  document.getElementById('btn-datang').disabled = true;
-                  document.getElementById('btn-pulang').disabled = true;
-              }
-              return;
-          } catch (e) {
-              if (attempt < MAX_RETRY) {
-                  outletEl.innerText = 'Koneksi lambat, mencoba lagi...';
-                  await new Promise(r => setTimeout(r, 3000));
-              } else {
-                  outletEl.innerText = 'Gociko (Mode Offline)';
-              }
-          }
-      }
-  }
+        container.classList.add('blink-mode');
+        instruction.classList.remove('hidden');
+        let dotIndex = 0;
 
-  async function showCamera(type) {
-      if (!modelsReady) { alert("Sensor wajah belum siap. Tunggu sebentar lagi ya!"); return; }
-      selectedType = type;
-      currentUser  = null;
-      document.getElementById('cam-title').innerText      = type === 'DATANG' ? 'Absen Masuk' : 'Absen Pulang';
-      document.getElementById('cam-type-badge').innerText = type === 'DATANG' ? '🟢 Masuk Kerja' : '🔴 Pulang Kerja';
-      filterDescriptorByOutlet(currentOutlet);
-      setCamStatus('info', 'Hadap kamera untuk absen');
-      showSection('section-camera');
-      document.getElementById('video-container').className = '';
-      await startCamera();
-  }
+        function updateDots(elapsed, total) {
+            const progress = Math.floor((elapsed / total) * 5);
+            while (dotIndex < progress && dotIndex < 5) {
+                dots[dotIndex].classList.add('active');
+                dotIndex++;
+            }
+        }
 
-  async function startVerification() {
-      if (isProcessing) return;
-      isProcessing = true;
-      const btn   = document.getElementById('btn-absensi');
-      const video = document.getElementById('video');
-      btn.disabled = true; btn.innerText = 'Memproses...';
+        function cleanup() {
+            container.classList.remove('blink-mode');
+            instruction.classList.add('hidden');
+            dots.forEach(d => { d.className = 'blink-dot'; });
+        }
 
-      try {
-          // STEP 1 — Anti-Spoofing
-          const shakeOk = await detectHeadShake(video);
-          if (!shakeOk) {
-              setCamStatus('error', 'Gerak kepala tidak terdeteksi! Coba lagi.');
-              btn.disabled = false; btn.innerText = 'KONFIRMASI ABSENSI'; isProcessing = false; return;
-          }
+        // ── WARM-UP: tunggu sampai wajah terdeteksi minimal 1x ───────
+        setCamStatus('info', 'Tatap kamera lurus sebentar...');
+        if (labelEl) labelEl.textContent = 'Tatap kamera...';
 
-          // STEP 2 — Jeda stabilisasi
-          await new Promise(r => setTimeout(r, 500));
+        const warmupDeadline = Date.now() + 6000; // max 6 detik warm-up
+        let faceFound = false;
+        while (Date.now() < warmupDeadline) {
+            const m = await getLandmarks(video);
+            if (m) { faceFound = true; break; }
+            await new Promise(r => setTimeout(r, SAMPLE_MS));
+        }
 
-          // STEP 3 — Deteksi Wajah
-          document.getElementById('video-container').classList.add('scanning');
-          setCamStatus('warning', 'Mendeteksi wajah...');
-          const detection = await detectFace(video);
-          document.getElementById('video-container').classList.remove('scanning');
+        if (!faceFound) {
+            cleanup();
+            setCamStatus('error', 'Wajah tidak terdeteksi! Pastikan pencahayaan cukup.');
+            return false;
+        }
 
-          if (!detection) {
-              setCamStatus('error', 'Wajah tidak terdeteksi! Pastikan pencahayaan cukup.');
-              btn.disabled = false; btn.innerText = 'KONFIRMASI ABSENSI'; isProcessing = false; return;
-          }
+        // Kamera sudah stabil, tunggu sebentar lagi biar exposure settle
+        await new Promise(r => setTimeout(r, 600));
 
-          // STEP 4 — 1:n Face Matching
-          const matched = matchFaceInOutlet(detection.descriptor);
-          if (!matched) {
-              setCamStatus('error', 'Wajah tidak dikenali! Pastikan Anda terdaftar di outlet ini.');
-              btn.disabled = false; btn.innerText = 'KONFIRMASI ABSENSI'; isProcessing = false; return;
-          }
+        // ── FASE 1: Ambil posisi baseline hidung ─────────────────────
+        const baselineStart   = Date.now();
+        const baselineSamples = [];
 
-          // STEP 5 — Konfirmasi identitas
-          currentUser = matched;
-          stopStream();
-          showKonfirmasiIdentitas(matched);
+        while (Date.now() - baselineStart < BASELINE_MS) {
+            const m = await getLandmarks(video);
+            if (m) baselineSamples.push(m);
+            await new Promise(r => setTimeout(r, SAMPLE_MS));
+        }
 
-      } catch (e) {
-          console.error(e);
-          alert("Terjadi kesalahan: " + e.message);
-          location.reload();
-      } finally {
-          isProcessing = false;
-      }
-  }
+        if (baselineSamples.length < 2) {
+            cleanup();
+            setCamStatus('error', 'Wajah tidak terdeteksi! Pastikan pencahayaan cukup.');
+            return false;
+        }
 
-  function showKonfirmasiIdentitas(matched) {
-      document.getElementById('konfirmasi-nama').innerText   = matched.nama;
-      document.getElementById('konfirmasi-nik').innerText    = 'NIK: ' + matched.nik;
-      document.getElementById('konfirmasi-outlet').innerText = '📍 ' + matched.outlet;
-      document.getElementById('konfirmasi-type').innerText   = selectedType === 'DATANG' ? '🟢 Absen Masuk' : '🔴 Absen Pulang';
-      showSection('section-konfirmasi');
-  }
+        // Median posisi hidung sebagai baseline (lebih tahan outlier)
+        baselineSamples.sort((a, b) => a.noseX - b.noseX);
+        const mid      = Math.floor(baselineSamples.length / 2);
+        const baseline = baselineSamples[mid];
+        const minMove  = baseline.faceWidth * HEAD_MOVE_RATIO;
 
-  async function konfirmasiAbsensi() {
-      if (!currentUser) return;
-      showSection('section-processing');
-      document.getElementById('processing-text').innerText = 'Menyimpan data absensi...';
-      try {
-          const payload = { aksi: "absensi", nik: currentUser.nik, nama: currentUser.nama, outlet: currentUser.outlet, status: selectedType };
-          const result  = await postAbsensi(payload);
-          if (result.includes("Sukses") || result.includes("sukses")) {
-              showSuccessScreen(new Date());
-          } else {
-              alert("Respons server: " + result);
-              location.reload();
-          }
-      } catch (e) {
-          alert("Terjadi kesalahan: " + e.message);
-          location.reload();
-      }
-  }
+        console.log(`[HeadShake] Baseline noseX: ${baseline.noseX.toFixed(1)}, faceWidth: ${baseline.faceWidth.toFixed(1)}, minMove: ${minMove.toFixed(1)}px`);
 
-  async function batalKonfirmasi() {
-      currentUser = null;
-      showSection('section-camera');
-      document.getElementById('btn-absensi').disabled  = false;
-      document.getElementById('btn-absensi').innerText = 'KONFIRMASI ABSENSI';
-      setCamStatus('info', 'Hadap kamera untuk absen');
-      await startCamera();
-  }
+        // ── JEDA countdown sebelum mulai deteksi ─────────────────────
+        for (let i = 3; i >= 1; i--) {
+            setCamStatus('info', `Gelengkan kepala dalam ${i}...`);
+            if (labelEl) labelEl.textContent = `Bersiap... ${i}`;
+            await new Promise(r => setTimeout(r, 800));
+        }
 
-  function showSuccessScreen(timestamp) {
-      const salamTitle = selectedType === 'DATANG' ? `Assalamu'alaikum ${currentUser.nama},` : `Wassalamu'alaikum ${currentUser.nama},`;
-      document.getElementById('success-name').innerText   = salamTitle;
-      document.getElementById('success-detail').innerText = selectedType === 'DATANG' ? 'Selamat bekerja! 💪' : 'Sampai jumpa! 👋';
-      const jam = timestamp.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
-      const tgl = timestamp.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Jakarta' });
-      document.getElementById('success-info').innerHTML =
-          `<div class="flex justify-between"><span>📋 NIK</span><span class="font-bold text-gray-700">${currentUser.nik}</span></div>` +
-          `<div class="flex justify-between"><span>📍 Outlet</span><span class="font-bold text-gray-700">${currentUser.outlet}</span></div>` +
-          `<div class="flex justify-between"><span>🕐 Jam</span><span class="font-bold text-gray-700">${jam} WIB</span></div>` +
-          `<div class="flex justify-between"><span>📅 Tanggal</span><span class="font-bold text-gray-700">${tgl}</span></div>`;
-      showSection('section-success');
-  }
+        setCamStatus('info', '↔️ Gelengkan kepala sekarang!');
+        if (labelEl) labelEl.textContent = '↔️ Gelengkan kepala sekarang!';
+        dotIndex = 0;
+        dots.forEach(d => { d.className = 'blink-dot'; });
 
-  function showSection(id) {
-      ['section-loading','section-main','section-camera','section-konfirmasi','section-processing','section-success']
-          .forEach(s => {
-              const el = document.getElementById(s);
-              if (el) { s === id ? el.classList.remove('hidden') : el.classList.add('hidden'); }
-          });
-  }
+        // ── FASE 2: Deteksi Gerak Kepala ─────────────────────────────
+        const detectStart = Date.now();
+        let maxLeft  = 0;
+        let maxRight = 0;
 
-  function setCamStatus(type, text) {
-      const badge  = document.getElementById('cam-status-badge');
-      const textEl = document.getElementById('cam-status-text');
-      badge.className  = 'status-badge status-' + type;
-      textEl.innerText = text;
-      const dot = document.createElement('span');
-      dot.className = 'dot' + (type === 'warning' || type === 'info' ? ' pulse' : '');
-      badge.prepend(dot);
-      const container   = document.getElementById('video-container');
-      const isScanning  = container.classList.contains('scanning');
-      const isBlinkMode = container.classList.contains('blink-mode');
-      if (!isScanning && !isBlinkMode) {
-          container.className = '';
-          if (type === 'success') container.classList.add('success');
-          if (type === 'error')   container.classList.add('error');
-          if (type === 'warning') container.classList.add('scanning');
-      }
-  }
+        while (Date.now() - detectStart < SHAKE_TIMEOUT_MS) {
+            updateDots(Date.now() - detectStart, SHAKE_TIMEOUT_MS);
 
-  function backToMain() {
-      stopStream();
-      currentUser = null;
-      showSection('section-main');
-  }
-  </script>
+            const m = await getLandmarks(video);
+            if (m) {
+                const deltaX = m.noseX - baseline.noseX;
+                if (deltaX < 0) maxLeft  = Math.max(maxLeft,  Math.abs(deltaX));
+                else            maxRight = Math.max(maxRight, deltaX);
+
+                console.log(`[HeadShake] noseX: ${m.noseX.toFixed(1)} | Δ: ${deltaX.toFixed(1)} | minMove: ${minMove.toFixed(1)} | L:${maxLeft.toFixed(1)} R:${maxRight.toFixed(1)}`);
+
+                if (maxLeft >= minMove || maxRight >= minMove) {
+                    dots.forEach(d => { d.classList.remove('active'); d.classList.add('done'); });
+                    await new Promise(r => setTimeout(r, 300));
+                    cleanup();
+                    return true;
+                }
+            }
+
+            await new Promise(r => setTimeout(r, SAMPLE_MS));
+        }
+
+        cleanup();
+        return false;
+    }
+
+    // ============================================================
+    //  7. VERIFIKASI WAJAH + KIRIM DATA
+    // ============================================================
+    let isProcessing = false;
+
+    async function startVerification() {
+        if (!currentUser || isProcessing) return;
+        isProcessing = true;
+
+        const btn = document.getElementById('btn-absensi');
+        btn.disabled = true;
+        btn.innerText = 'Memproses...';
+
+        const video = document.getElementById('video');
+
+        try {
+            // ── STEP 1: ANTI-SPOOFING — Gerak Kepala ─────────────────
+            const shakeOk = await detectHeadShake(video);
+
+            if (!shakeOk) {
+                setCamStatus('error', 'Gerak kepala tidak terdeteksi! Pastikan wajah terlihat jelas lalu coba lagi.');
+                btn.disabled = false;
+                btn.innerText = 'KONFIRMASI ABSENSI';
+                isProcessing = false;
+                return; // 🛑 STOP
+            }
+
+            // ── STEP 2: DETEKSI WAJAH + AMBIL DESCRIPTOR ─────────────
+            setCamStatus('warning', 'Wajah terdeteksi! Memproses...');
+            document.getElementById('video-container').classList.add('scanning');
+
+            let detection = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                detection = await faceapi
+                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+                if (detection) break;
+                await new Promise(r => setTimeout(r, 400));
+            }
+
+            document.getElementById('video-container').classList.remove('scanning');
+
+            if (!detection) {
+                setCamStatus('error', 'Wajah tidak terdeteksi! Pastikan pencahayaan cukup dan wajah menghadap kamera.');
+                btn.disabled = false;
+                btn.innerText = 'KONFIRMASI ABSENSI';
+                isProcessing = false;
+                return; // 🛑 STOP
+            }
+
+            // ── STEP 3: PINDAH KE PROCESSING + FACE MATCHING ─────────
+            showSection('section-processing');
+            stopStream();
+
+            const processingText = document.getElementById('processing-text');
+            processingText.innerText = 'Mencocokkan wajah dengan database...';
+
+            const targetKaryawan = allDescriptors.find(k => String(k.nik) === String(currentUser.nik));
+
+            if (targetKaryawan) {
+                const distance = faceapi.euclideanDistance(detection.descriptor, targetKaryawan.descriptor);
+                console.log(`[Gociko] Face distance: ${distance.toFixed(4)} (threshold: ${FACE_MATCH_THRESHOLD})`);
+
+                if (distance > FACE_MATCH_THRESHOLD) {
+                    showSection('section-camera');
+                    await startCamera();
+                    setCamStatus('error', `Wajah tidak cocok (jarak: ${distance.toFixed(2)}). Pastikan Anda sendiri yang absen.`);
+                    btn.disabled = false;
+                    btn.innerText = 'KONFIRMASI ABSENSI';
+                    isProcessing = false;
+                    return; // 🛑 STOP
+                }
+            } else {
+                console.warn(`[Gociko] NIK ${currentUser.nik} belum punya data wajah terdaftar.`);
+            }
+
+            // ── STEP 4: KIRIM DATA KE GAS ─────────────────────────────
+            processingText.innerText = 'Menyimpan data absensi...';
+
+            const now = new Date();
+            const payload = {
+                aksi: "absensi",
+                nik: currentUser.nik,
+                nama: currentUser.nama,
+                outlet: document.getElementById('outlet-text').innerText,
+                status: selectedType,
+                timestamp: now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+            };
+
+            const response = await fetch(GAS_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.text();
+
+            if (result.includes("Sukses") || result.includes("sukses")) {
+                showSuccessScreen(now);
+            } else {
+                alert("Respons server: " + result);
+                location.reload();
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Terjadi kesalahan: " + e.message);
+            location.reload();
+        } finally {
+            isProcessing = false;
+        }
+    }
+
+    // ============================================================
+    //  7. TAMPILKAN LAYAR SUKSES
+    // ============================================================
+    function showSuccessScreen(timestamp) {
+        const nama = currentUser.nama;
+        const salamTitle = selectedType === 'DATANG'
+            ? `Assalamu'alaikum ${nama},`
+            : `Wassalamu'alaikum ${nama},`;
+        const salamSub = selectedType === 'DATANG'
+            ? 'Selamat bekerja! 💪'
+            : 'Sampai jumpa! 👋';
+
+        document.getElementById('success-name').innerText = salamTitle;
+        document.getElementById('success-detail').innerText = salamSub;
+
+        const jam = timestamp.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+        const tgl = timestamp.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Jakarta' });
+
+        document.getElementById('success-info').innerHTML = `
+            <div class="flex justify-between"><span>📋 NIK</span><span class="font-bold text-gray-700">${currentUser.nik}</span></div>
+            <div class="flex justify-between"><span>📍 Outlet</span><span class="font-bold text-gray-700">${currentUser.outlet || '-'}</span></div>
+            <div class="flex justify-between"><span>🕐 Jam</span><span class="font-bold text-gray-700">${jam} WIB</span></div>
+            <div class="flex justify-between"><span>📅 Tanggal</span><span class="font-bold text-gray-700">${tgl}</span></div>
+        `;
+
+        showSection('section-success');
+    }
+
+    // ============================================================
+    //  UTILITIES
+    // ============================================================
+    function showSection(id) {
+        ['section-loading','section-main','section-camera','section-processing','section-success']
+            .forEach(s => {
+                const el = document.getElementById(s);
+                if (s === id) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+    }
+
+    function setCamStatus(type, text) {
+        const badge = document.getElementById('cam-status-badge');
+        const textEl = document.getElementById('cam-status-text');
+        badge.className = `status-badge status-${type}`;
+        textEl.innerText = text;
+
+        const dot = document.createElement('span');
+        dot.className = `dot${type === 'warning' || type === 'info' ? ' pulse' : ''}`;
+        badge.prepend(dot);
+
+        // Update video border color
+        const container = document.getElementById('video-container');
+        container.className = '';
+        if (type === 'success') container.classList.add('success');
+        if (type === 'error') container.classList.add('error');
+        if (type === 'warning') container.classList.add('scanning');
+    }
+
+    function stopStream() {
+        if (streamRef) {
+            streamRef.getTracks().forEach(t => t.stop());
+            streamRef = null;
+        }
+    }
+
+    function stopCamera() {
+        // Tidak stop stream agar frame terakhir tetap bisa diproses
+    }
+
+    async function startCamera() {
+        try {
+            stopStream();
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            streamRef = stream;
+            document.getElementById('video').srcObject = stream;
+        } catch (e) {}
+    }
+
+    function backToMain() {
+        stopStream();
+        currentUser = null;
+        showSection('section-main');
+    }
+
+    // Stop stream saat navigasi keluar
+    window.addEventListener('beforeunload', stopStream);
+    </script>
 </body>
 </html>
+
